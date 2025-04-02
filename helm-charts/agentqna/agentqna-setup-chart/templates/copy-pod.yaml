@@ -1,0 +1,54 @@
+# Mounts PVC and downloads files needed for the example to it
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tools-setup-pod
+spec:
+  restartPolicy: Never
+  containers:
+    - name: huggingface-downloader
+      image: huggingface/downloader:0.17.3
+      env:
+      - name: DOWNLOAD_MODEL_ID
+        value: {{ .Values.model }}
+      - name: HUGGINGFACEHUB_API_TOKEN
+        value: {{ .Values.global.HUGGINGFACEHUB_API_TOKEN }}
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "300m"
+        limits:
+          memory: "4Gi"
+      command: ['sh', '-ec']
+      args:
+      - |
+        # tools used by supervisor
+        wget https://raw.githubusercontent.com/opea-project/GenAIExamples/refs/heads/main/AgentQnA/tools/supervisor_agent_tools.yaml -O /mnt/tools/supervisor_agent_tools.yaml
+        wget https://raw.githubusercontent.com/opea-project/GenAIExamples/refs/heads/main/AgentQnA/tools/tools.py -O /mnt/tools/tools.py
+        wget https://raw.githubusercontent.com/opea-project/GenAIExamples/refs/heads/main/AgentQnA/tools/pycragapi.py -O /mnt/tools/pycragapi.py
+        # tools used by rag agent
+        wget https://raw.githubusercontent.com/opea-project/GenAIExamples/refs/heads/main/AgentQnA/tools/worker_agent_tools.yaml -O /mnt/tools/worker_agent_tools.yaml
+        wget https://raw.githubusercontent.com/opea-project/GenAIExamples/refs/heads/main/AgentQnA/tools/worker_agent_tools.py -O /mnt/tools/worker_agent_tools.py
+        # Download the sqlite database binary file
+        wget https://raw.githubusercontent.com/lerocha/chinook-database/refs/heads/master/ChinookDatabase/DataSources/Chinook_Sqlite.sqlite -O /mnt/tools/Chinook_Sqlite.sqlite
+        
+        # If ${DOWNLOAD_MODEL_ID} is set and non-empty, also download the model to /mnt/tools
+        if [ -n "${DOWNLOAD_MODEL_ID}" ]; then
+          echo "${DOWNLOAD_MODEL_ID} is set to ${DOWNLOAD_MODEL_ID}, downloading from huggingface"
+          huggingface-cli login --token ${HUGGINGFACEHUB_API_TOKEN}
+          huggingface-cli download --include="*.safetensors" --cache-dir /mnt/tools "${DOWNLOAD_MODEL_ID}"
+        else
+          echo "${DOWNLOAD_MODEL_ID} is not set or empty, not downloading any models."
+        fi
+        chmod -R 777 /mnt/tools/
+        echo "All downloads completed successfully!"
+        exit 0
+      volumeMounts:
+        - name: tools-volume
+          mountPath: /mnt/tools
+      
+  volumes:
+    - name: tools-volume
+      persistentVolumeClaim:
+        claimName: {{ .Values.global.modelUsePVC }}

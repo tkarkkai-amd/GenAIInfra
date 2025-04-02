@@ -1,0 +1,119 @@
+LOGFLAG: true
+llm_endpoint_url: http://{{ .Release.Name }}-vllm
+# Change model name here and other places in this file if you want to use another model
+model: "meta-llama/Llama-3.3-70B-Instruct"
+resources:
+  limits:
+    memory: 16384Mi
+  requests:
+    cpu: "300m"
+    memory: 512Mi
+
+serviceAccount:
+  create: false
+
+vllm:
+  enabled: true
+  accelDevice: "rocm" # not sure if this does anything when using rocm
+  image:
+    repository: rocm/vllm
+    tag: rocm6.3.1_mi300_ubuntu22.04_py3.12_vllm_0.6.6
+  command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+  # NOTE: tool-call-parser may be different with different models, e.g. Qwen uses "hermes". 
+  extraCmdArgs: ["--max-model-len", "16384", "--max-seq_len-to-capture", "16384", "--enable-auto-tool-choice", "--tool-call-parser", "llama3_json", "--dtype", "float16"]
+  securityContext:
+  # run with full privileges so GPU can be used
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false
+    runAsUser: 0
+    allowPrivilegeEscalation: true
+
+  resources:
+    requests:
+      amd.com/gpu: "1"
+      memory: "8192Mi"
+      cpu: "1"
+    limits:
+      memory: "32768Mi"
+      amd.com/gpu: "1"
+  LLM_MODEL_ID: meta-llama/Llama-3.3-70B-Instruct
+
+supervisor:
+  recursion_limit: "14"
+  toolPVC: agentqna-pvc
+  llm_endpoint_url: http://{{ .Release.Name }}-vllm
+  llm_engine: vllm
+  model: "meta-llama/Llama-3.3-70B-Instruct"
+  resources:
+    # All pods have limits because the cluster I'm using requires setting limits
+    limits:
+      memory: 8192Mi
+    
+ragagent:
+  recursion_limit: "10"
+  toolPVC: agentqna-pvc
+  llm_endpoint_url: http://{{ .Release.Name }}-vllm
+  llm_engine: vllm
+  model: "meta-llama/Llama-3.3-70B-Instruct"
+  resources:
+    limits:
+      memory: 8192Mi
+
+sqlagent:
+  recursion_limit: "10"
+  toolPVC: agentqna-pvc
+  llm_endpoint_url: http://{{ .Release.Name }}-vllm
+  llm_engine: vllm
+  model: "meta-llama/Llama-3.3-70B-Instruct"
+  resources:
+    limits:
+      memory: 8192Mi
+
+tei:
+  resources:
+    limits:
+      memory: 8192Mi
+    
+teirerank:
+  resources:
+    limits:
+      memory: 32768Mi
+    
+embedding-usvc:
+  resources:
+    limits:
+      memory: 8192Mi
+    
+reranking-usvc:
+  resources:
+    limits:
+      memory: 8192Mi
+    
+redis-vector-db:
+  resources:
+    limits:
+      memory: 8192Mi
+    
+retriever-usvc:
+  resources:
+    limits:
+      memory: 8192Mi
+  # Something was wrong with the latest?
+  image:
+    tag: "1.2"
+    
+data-prep:
+  resources:
+    limits:
+      memory: 8192Mi
+    
+agentqna-ui:
+  resources:
+    limits:
+      memory: 8192Mi
+    
+nginx:
+  resources:
+    limits:
+      memory: 8192Mi
+    
